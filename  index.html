@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivicInquire — Homelessness Policy Map of Canada</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+  :root {
+    --fci-yellow: #F7D044;
+    --fci-black: #000000;
+    --fci-charcoal: #393838;
+    --fci-offwhite: #F5F4F0;
+    --fci-white: #FFFFFF;
+    --fci-yellow-soft: rgba(247, 208, 68, 0.12);
+    --fci-yellow-mid: rgba(247, 208, 68, 0.35);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+    --radius: 6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', Calibri, sans-serif;
+    background: var(--fci-offwhite);
+    color: var(--fci-charcoal);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── WRAPPER ── */
+  .app-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  .app-header {
+    background: var(--fci-black);
+    border-top: 5px solid var(--fci-yellow);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 16px;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+  .header-logo {
+    width: 28px;
+    height: 28px;
+    background: var(--fci-yellow);
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--fci-black);
+  }
+  .header-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--fci-white);
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .header-title span {
+    color: var(--fci-yellow);
+    font-weight: 700;
+  }
+  .header-subtitle {
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .app-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 340px;
+    flex-shrink: 0;
+    background: var(--fci-white);
+    border-right: 1px solid rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 500;
+  }
+
+  .filter-section {
+    padding: 20px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .filter-section:last-of-type {
+    border-bottom: none;
+  }
+
+  .filter-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(57,56,56,0.55);
+    margin-bottom: 8px;
+  }
+
+  .search-wrap {
+    position: relative;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: rgba(57,56,56,0.35);
+    pointer-events: none;
+  }
+  .search-input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 1.5px solid rgba(0,0,0,0.10);
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--fci-charcoal);
+    background: var(--fci-white);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  .search-input::placeholder { color: rgba(57,56,56,0.4); }
+  .search-input:focus {
+    border-color: var(--fci-yellow);
+    box-shadow: 0 0 0 3px var(--fci-yellow-soft);
+  }
+
+  .filter-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid rgba(0,0,0,0.10);
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--fci-charcoal);
+    background: var(--fci-white);
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23393838' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .filter-select:focus {
+    border-color: var(--fci-yellow);
+    box-shadow: 0 0 0 3px var(--fci-yellow-soft);
+  }
+
+  .results-count {
+    padding: 14px 20px;
+    font-size: 13px;
+    color: rgba(57,56,56,0.6);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .results-count strong {
+    color: var(--fci-charcoal);
+    font-weight: 600;
+  }
+  .clear-btn {
+    background: none;
+    border: none;
+    color: var(--fci-charcoal);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+  .clear-btn:hover { opacity: 1; }
+
+  /* ── POLICY LIST ── */
+  .policy-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+  }
+  .policy-list::-webkit-scrollbar { width: 5px; }
+  .policy-list::-webkit-scrollbar-track { background: transparent; }
+  .policy-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
+
+  .policy-card {
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+    border-left: 3px solid transparent;
+    margin-bottom: 2px;
+  }
+  .policy-card:hover {
+    background: var(--fci-yellow-soft);
+  }
+  .policy-card.active {
+    background: var(--fci-yellow-soft);
+    border-left-color: var(--fci-yellow);
+  }
+  .policy-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fci-charcoal);
+    margin-bottom: 3px;
+    line-height: 1.35;
+  }
+  .policy-card-meta {
+    font-size: 12px;
+    color: rgba(57,56,56,0.55);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .policy-card-tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(0,0,0,0.06);
+    color: var(--fci-charcoal);
+  }
+
+  /* ── MAP ── */
+  .map-container {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+  }
+  #map {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Leaflet popup overrides */
+  .leaflet-popup-content-wrapper {
+    border-radius: var(--radius) !important;
+    box-shadow: var(--shadow-lg) !important;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+  .leaflet-popup-content {
+    margin: 0 !important;
+    min-width: 260px;
+    max-width: 320px;
+    font-family: 'DM Sans', Calibri, sans-serif !important;
+  }
+  .leaflet-popup-tip {
+    box-shadow: none !important;
+  }
+  .popup-inner {
+    padding: 0;
+  }
+  .popup-header {
+    background: var(--fci-black);
+    padding: 14px 18px 12px;
+    border-top: 4px solid var(--fci-yellow);
+  }
+  .popup-header h3 {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--fci-white);
+    font-size: 15px;
+    font-weight: 400;
+    margin: 0 0 2px;
+  }
+  .popup-header .popup-city {
+    color: var(--fci-yellow);
+    font-family: 'DM Sans', Calibri, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .popup-body {
+    padding: 14px 18px 16px;
+  }
+  .popup-body p {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--fci-charcoal);
+    margin: 0 0 12px;
+  }
+  .popup-meta-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .popup-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--fci-yellow-soft);
+    color: var(--fci-charcoal);
+  }
+  .popup-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fci-charcoal);
+    text-decoration: none;
+    border-bottom: 1.5px solid var(--fci-yellow);
+    padding-bottom: 1px;
+    transition: color 0.2s;
+  }
+  .popup-link:hover { color: var(--fci-black); }
+
+  /* ── CUSTOM MARKER ── */
+  .fci-marker {
+    width: 28px;
+    height: 28px;
+    position: relative;
+  }
+  .fci-marker-dot {
+    width: 14px;
+    height: 14px;
+    background: var(--fci-yellow);
+    border: 2.5px solid var(--fci-black);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .fci-marker:hover .fci-marker-dot,
+  .fci-marker.active .fci-marker-dot {
+    transform: translate(-50%, -50%) scale(1.35);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  }
+  .fci-marker-ring {
+    width: 28px;
+    height: 28px;
+    border: 2px solid rgba(247, 208, 68, 0.3);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* ── LEGEND ── */
+  .map-legend {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    background: var(--fci-white);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    box-shadow: var(--shadow-md);
+    z-index: 450;
+    font-size: 12px;
+    max-width: 200px;
+  }
+  .map-legend h4 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(57,56,56,0.5);
+    margin-bottom: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--fci-yellow);
+    border: 2px solid var(--fci-black);
+    flex-shrink: 0;
+  }
+  .legend-label {
+    color: var(--fci-charcoal);
+    font-size: 12px;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: rgba(57,56,56,0.45);
+  }
+  .empty-state svg {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 12px;
+    opacity: 0.3;
+  }
+  .empty-state p {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* ── MOBILE ── */
+  .mobile-toggle {
+    display: none;
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 600;
+    background: var(--fci-black);
+    color: var(--fci-white);
+    border: none;
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mobile-toggle svg { width: 16px; height: 16px; }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 300px;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 550;
+      box-shadow: var(--shadow-lg);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .mobile-toggle { display: flex; }
+    .map-legend { bottom: 16px; right: 16px; }
+  }
+
+  /* ── ATTRIBUTION OVERRIDE ── */
+  .leaflet-control-attribution {
+    font-size: 10px !important;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="header-logo">CI</div>
+      <div class="header-title"><span>CivicInquire</span> &mdash; Homelessness Policy Map</div>
+    </div>
+    <div class="header-subtitle">Future Cities Institute</div>
+  </header>
+
+  <!-- BODY -->
+  <div class="app-body">
+
+    <!-- MOBILE TOGGLE -->
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle filters">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      Filters
+    </button>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="filter-section">
+        <div class="filter-label">Search policies</div>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" class="search-input" id="searchInput" placeholder="Search by keyword...">
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <div class="filter-label">Province / Territory</div>
+        <select class="filter-select" id="provinceFilter">
+          <option value="">All provinces</option>
+        </select>
+      </div>
+
+      <div class="filter-section">
+        <div class="filter-label">Policy category</div>
+        <select class="filter-select" id="categoryFilter">
+          <option value="">All categories</option>
+        </select>
+      </div>
+
+      <div class="results-count" id="resultsCount">
+        Showing <strong id="countNum">0</strong> policies
+        <button class="clear-btn" id="clearBtn">Clear filters</button>
+      </div>
+
+      <div class="policy-list" id="policyList"></div>
+    </aside>
+
+    <!-- MAP -->
+    <div class="map-container">
+      <div id="map"></div>
+      <div class="map-legend">
+        <h4>Legend</h4>
+        <div class="legend-item">
+          <div class="legend-dot"></div>
+          <div class="legend-label">Municipal policy</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SAMPLE DATA — Replace with your real dataset
+// Each entry needs: id, name, city, province, lat, lng,
+// category, year, summary, sourceUrl (optional)
+// ============================================================
+const POLICIES = [
+  {
+    id: 1,
+    name: "A Place to Call Home: Edmonton's Updated Plan to Prevent and End Homelessness",
+    city: "Edmonton",
+    province: "Alberta",
+    lat: 53.5461,
+    lng: -113.4938,
+    category: "Housing First",
+    year: 2017,
+    summary: "Edmonton's community plan centred on Housing First, prevention, and systems integration to reduce chronic and episodic homelessness across the city.",
+    sourceUrl: "https://homewardtrust.ca"
+  },
+  {
+    id: 2,
+    name: "Calgary's Updated Plan to End Homelessness",
+    city: "Calgary",
+    province: "Alberta",
+    lat: 51.0447,
+    lng: -114.0719,
+    category: "Housing First",
+    year: 2015,
+    summary: "Calgary Homeless Foundation's plan targeting chronic and episodic homelessness through coordinated Housing First programs and prevention strategies.",
+    sourceUrl: "#"
+  },
+  {
+    id: 3,
+    name: "Toronto Housing and Homelessness Recovery Plan",
+    city: "Toronto",
+    province: "Ontario",
+    lat: 43.6532,
+    lng: -79.3832,
+    category: "Emergency Shelter",
+    year: 2021,
+    summary: "Post-pandemic recovery framework addressing emergency shelter capacity, encampment response, and pathways to permanent housing.",
+    sourceUrl: "#"
+  },
+  {
+    id: 4,
+    name: "HousingTO 2020–2030 Action Plan",
+    city: "Toronto",
+    province: "Ontario",
+    lat: 43.6612,
+    lng: -79.3950,
+    category: "Supportive Housing",
+    year: 2020,
+    summary: "City of Toronto's 10-year plan committing to 40,000 new affordable rental and supportive housing units, with targets for Indigenous and equity-deserving groups.",
+    sourceUrl: "#"
+  },
+  {
+    id: 5,
+    name: "Vancouver Homelessness and Supportive Housing Strategy",
+    city: "Vancouver",
+    province: "British Columbia",
+    lat: 49.2827,
+    lng: -123.1207,
+    category: "Supportive Housing",
+    year: 2020,
+    summary: "Municipal strategy focused on expanding modular supportive housing, coordinated access, and wrap-around services for residents experiencing homelessness.",
+    sourceUrl: "#"
+  },
+  {
+    id: 6,
+    name: "Victoria's Greater Victoria Coalition to End Homelessness",
+    city: "Victoria",
+    province: "British Columbia",
+    lat: 48.4284,
+    lng: -123.3656,
+    category: "Coordinated Access",
+    year: 2019,
+    summary: "Regional coalition establishing coordinated access and assessment systems across Greater Victoria municipalities.",
+    sourceUrl: "#"
+  },
+  {
+    id: 7,
+    name: "Ottawa Homelessness and Housing Plan",
+    city: "Ottawa",
+    province: "Ontario",
+    lat: 45.4215,
+    lng: -75.6972,
+    category: "Prevention & Diversion",
+    year: 2020,
+    summary: "City of Ottawa plan prioritizing homelessness prevention, rapid rehousing, and improved coordination among service providers.",
+    sourceUrl: "#"
+  },
+  {
+    id: 8,
+    name: "Winnipeg Street Census and Plan to End Homelessness",
+    city: "Winnipeg",
+    province: "Manitoba",
+    lat: 49.8951,
+    lng: -97.1384,
+    category: "Emergency Shelter",
+    year: 2018,
+    summary: "Community-driven plan informed by point-in-time count data, addressing Indigenous overrepresentation and winter emergency shelter needs.",
+    sourceUrl: "#"
+  },
+  {
+    id: 9,
+    name: "Montreal's Plan d'action en itinérance",
+    city: "Montreal",
+    province: "Quebec",
+    lat: 45.5017,
+    lng: -73.5673,
+    category: "Prevention & Diversion",
+    year: 2021,
+    summary: "Municipal action plan focusing on outreach, prevention services, and improved coordination between health and social service networks.",
+    sourceUrl: "#"
+  },
+  {
+    id: 10,
+    name: "Halifax Regional Municipality Housing and Homelessness Partnership",
+    city: "Halifax",
+    province: "Nova Scotia",
+    lat: 44.6488,
+    lng: -63.5752,
+    category: "Coordinated Access",
+    year: 2019,
+    summary: "Regional partnership between HRM and community agencies establishing coordinated access and by-name list approaches.",
+    sourceUrl: "#"
+  },
+  {
+    id: 11,
+    name: "Saskatoon Homelessness Action Plan",
+    city: "Saskatoon",
+    province: "Saskatchewan",
+    lat: 52.1332,
+    lng: -106.6700,
+    category: "Housing First",
+    year: 2018,
+    summary: "Community plan focused on Housing First, data-driven point-in-time counts, and targeted Indigenous housing supports.",
+    sourceUrl: "#"
+  },
+  {
+    id: 12,
+    name: "Hamilton Housing and Homelessness Action Plan",
+    city: "Hamilton",
+    province: "Ontario",
+    lat: 43.2557,
+    lng: -79.8711,
+    category: "Supportive Housing",
+    year: 2020,
+    summary: "Municipal plan addressing homelessness through expanded supportive housing, rent supplements, and landlord engagement programs.",
+    sourceUrl: "#"
+  },
+  {
+    id: 13,
+    name: "Region of Waterloo Homelessness to Housing Stability Strategy",
+    city: "Waterloo",
+    province: "Ontario",
+    lat: 43.4643,
+    lng: -80.5204,
+    category: "Prevention & Diversion",
+    year: 2019,
+    summary: "Regional strategy emphasizing prevention, diversion from shelters, and rapid rehousing with dedicated funding for Indigenous-led services.",
+    sourceUrl: "#"
+  },
+  {
+    id: 14,
+    name: "St. John's Community Plan to End Homelessness",
+    city: "St. John's",
+    province: "Newfoundland and Labrador",
+    lat: 47.5615,
+    lng: -52.7126,
+    category: "Housing First",
+    year: 2014,
+    summary: "Community-based plan centred on Housing First principles, targeting chronic homelessness through permanent supportive housing.",
+    sourceUrl: "#"
+  },
+  {
+    id: 15,
+    name: "Regina Homelessness Community Advisory Board Plan",
+    city: "Regina",
+    province: "Saskatchewan",
+    lat: 50.4452,
+    lng: -104.6189,
+    category: "Emergency Shelter",
+    year: 2019,
+    summary: "Advisory board plan addressing emergency shelter access, transitional housing, and community-based mental health supports.",
+    sourceUrl: "#"
+  },
+  {
+    id: 16,
+    name: "Yellowknife Homelessness and Housing Framework",
+    city: "Yellowknife",
+    province: "Northwest Territories",
+    lat: 62.4540,
+    lng: -114.3718,
+    category: "Supportive Housing",
+    year: 2021,
+    summary: "Northern-context framework addressing extreme climate shelter needs, culturally appropriate housing, and service coordination.",
+    sourceUrl: "#"
+  },
+  {
+    id: 17,
+    name: "Whitehorse Housing Action Plan",
+    city: "Whitehorse",
+    province: "Yukon",
+    lat: 60.7212,
+    lng: -135.0568,
+    category: "Prevention & Diversion",
+    year: 2020,
+    summary: "Territorial capital plan addressing housing affordability and homelessness prevention in Yukon's northern context.",
+    sourceUrl: "#"
+  },
+  {
+    id: 18,
+    name: "London Ontario Community Plan on Homelessness",
+    city: "London",
+    province: "Ontario",
+    lat: 42.9849,
+    lng: -81.2453,
+    category: "Coordinated Access",
+    year: 2019,
+    summary: "Coordinated access and by-name list implementation in London, Ontario, with focus on chronic homelessness and systems integration.",
+    sourceUrl: "#"
+  }
+];
+
+
+// ============================================================
+// INIT MAP
+// ============================================================
+const map = L.map('map', {
+  center: [56.0, -96.0],
+  zoom: 4,
+  minZoom: 3,
+  maxZoom: 14,
+  zoomControl: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+// Custom icon
+function createIcon() {
+  return L.divIcon({
+    className: '',
+    html: '<div class="fci-marker"><div class="fci-marker-ring"></div><div class="fci-marker-dot"></div></div>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+  });
+}
+
+// ============================================================
+// POPULATE FILTERS
+// ============================================================
+const provinces = [...new Set(POLICIES.map(p => p.province))].sort();
+const categories = [...new Set(POLICIES.map(p => p.category))].sort();
+
+const provinceFilter = document.getElementById('provinceFilter');
+const categoryFilter = document.getElementById('categoryFilter');
+
+provinces.forEach(prov => {
+  const opt = document.createElement('option');
+  opt.value = prov;
+  opt.textContent = prov;
+  provinceFilter.appendChild(opt);
+});
+
+categories.forEach(cat => {
+  const opt = document.createElement('option');
+  opt.value = cat;
+  opt.textContent = cat;
+  categoryFilter.appendChild(opt);
+});
+
+// ============================================================
+// MARKERS & RENDERING
+// ============================================================
+let markers = [];
+let activeCardId = null;
+
+function buildPopupHTML(policy) {
+  const link = policy.sourceUrl && policy.sourceUrl !== '#'
+    ? `<a class="popup-link" href="${policy.sourceUrl}" target="_blank" rel="noopener">View source &rarr;</a>`
+    : '';
+  return `
+    <div class="popup-inner">
+      <div class="popup-header">
+        <h3>${policy.name}</h3>
+        <div class="popup-city">${policy.city}, ${policy.province}</div>
+      </div>
+      <div class="popup-body">
+        <div class="popup-meta-row">
+          <span class="popup-tag">${policy.category}</span>
+          <span class="popup-tag">${policy.year}</span>
+        </div>
+        <p>${policy.summary}</p>
+        ${link}
+      </div>
+    </div>
+  `;
+}
+
+function renderPolicies(filtered) {
+  // Clear markers
+  markers.forEach(m => map.removeLayer(m.marker));
+  markers = [];
+
+  // Add new markers
+  filtered.forEach(policy => {
+    const marker = L.marker([policy.lat, policy.lng], { icon: createIcon() })
+      .bindPopup(buildPopupHTML(policy), { maxWidth: 320, closeButton: true })
+      .addTo(map);
+
+    marker.on('click', () => {
+      setActiveCard(policy.id);
+    });
+
+    markers.push({ policy, marker });
+  });
+
+  // Render sidebar list
+  const listEl = document.getElementById('policyList');
+  if (filtered.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <p>No policies match your current filters.<br>Try broadening your search.</p>
+      </div>
+    `;
+  } else {
+    listEl.innerHTML = filtered.map(p => `
+      <div class="policy-card" data-id="${p.id}">
+        <div class="policy-card-title">${p.name}</div>
+        <div class="policy-card-meta">
+          <span>${p.city}, ${p.province}</span>
+          <span class="policy-card-tag">${p.category}</span>
+        </div>
+      </div>
+    `).join('');
+
+    // Card click handlers
+    listEl.querySelectorAll('.policy-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = parseInt(card.dataset.id);
+        const entry = markers.find(m => m.policy.id === id);
+        if (entry) {
+          map.setView([entry.policy.lat, entry.policy.lng], 10, { animate: true });
+          entry.marker.openPopup();
+          setActiveCard(id);
+        }
+      });
+    });
+  }
+
+  document.getElementById('countNum').textContent = filtered.length;
+}
+
+function setActiveCard(id) {
+  activeCardId = id;
+  document.querySelectorAll('.policy-card').forEach(c => {
+    c.classList.toggle('active', parseInt(c.dataset.id) === id);
+  });
+  // Scroll card into view
+  const activeEl = document.querySelector(`.policy-card[data-id="${id}"]`);
+  if (activeEl) {
+    activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ============================================================
+// FILTERING
+// ============================================================
+function getFiltered() {
+  const search = document.getElementById('searchInput').value.toLowerCase().trim();
+  const province = provinceFilter.value;
+  const category = categoryFilter.value;
+
+  return POLICIES.filter(p => {
+    if (province && p.province !== province) return false;
+    if (category && p.category !== category) return false;
+    if (search) {
+      const haystack = `${p.name} ${p.city} ${p.province} ${p.category} ${p.summary}`.toLowerCase();
+      return haystack.includes(search);
+    }
+    return true;
+  });
+}
+
+function applyFilters() {
+  const filtered = getFiltered();
+  renderPolicies(filtered);
+
+  // Fit map bounds if we have results
+  if (filtered.length > 0) {
+    const group = L.featureGroup(markers.map(m => m.marker));
+    map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 10 });
+  }
+}
+
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+provinceFilter.addEventListener('change', applyFilters);
+categoryFilter.addEventListener('change', applyFilters);
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  provinceFilter.value = '';
+  categoryFilter.value = '';
+  applyFilters();
+  map.setView([56.0, -96.0], 4);
+});
+
+// ============================================================
+// MOBILE SIDEBAR TOGGLE
+// ============================================================
+document.getElementById('mobileToggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+});
+
+// Close sidebar on map click (mobile)
+map.on('click', () => {
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+  }
+});
+
+// ============================================================
+// INITIAL RENDER
+// ============================================================
+renderPolicies(POLICIES);
+</script>
+
+</body>
+</html>
